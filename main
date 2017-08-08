@@ -46,9 +46,12 @@ DOCKER_IMAGE=$(cat "${PROJECT_FILEPATH}" | jq -r .image)
 
 echo "Use '${DOCKER_IMAGE}'"
 
-for BUILD in $(cat "${PROJECT_BASE}/${PROJECT_FILE}" | jq -c .build[]); do
-  BUILD_DIR=$(echo "${BUILD}" | jq -r -c ".dir // empty")
-  BUILD_CMD=$(echo "${BUILD}" | jq -r .cmd)
+LENGTH=$( cat "${PROJECT_BASE}/${PROJECT_FILE}" | jq ".build | length" )
+COUNT=$(( ${LENGTH} - 1 ))
+
+for INDEX in $(seq 0 ${COUNT}); do
+  BUILD_DIR=$(cat "${PROJECT_BASE}/${PROJECT_FILE}" | jq -r -c ".build[${INDEX}].dir // empty")
+  BUILD_CMD=$(cat "${PROJECT_BASE}/${PROJECT_FILE}" | jq -r -c ".build[${INDEX}].cmd")
 
   if [[ -z ${BUILD_DIR} ]]; then
     WORKDIR="${PROJECT_BASE}"
