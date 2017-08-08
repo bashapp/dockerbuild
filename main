@@ -1,0 +1,78 @@
+#!/bin/bash
+
+function find_file()
+{
+  local NAME="$1"
+  local CURR=$(pwd)
+
+  while true; do
+    local FILE="${CURR}/${NAME}"
+
+    if [[ -f "${FILE}" ]]; then
+      break
+    fi
+
+    local NEXT="$(dirname "${CURR}")"
+
+    if [[ "${CURR}" = "${NEXT}" ]]; then
+      break
+    fi
+
+    CURR="${NEXT}"
+  done
+
+  if [[ -f "${FILE}" ]]; then
+    echo "${CURR}"
+  fi
+}
+
+PROJECT_FILE="docker-build.json"
+PROJECT_BASE=$(find_file "${PROJECT_FILE}")
+
+if [[ -z "${PROJECT_BASE}" ]]; then
+  echo "ERROR: Cannot find '${PROJECT_FILE}'"
+  exit 255
+fi
+
+PROJECT_FILEPATH="${PROJECT_BASE}/${PROJECT_FILE}"
+
+cat "${PROJECT_FILEPATH}" | jq . > /dev/null
+
+if [[ $? -ne 0 ]]; then
+  exit 255
+fi
+
+DOCKER_IMAGE=$(cat "${PROJECT_FILEPATH}" | jq -r .image)
+
+echo "Use '${DOCKER_IMAGE}'"
+
+for BUILD in $(cat "${PROJECT_BASE}/${PROJECT_FILE}" | jq -c .build[]); do
+  BUILD_DIR=$(echo "${BUILD}" | jq -r -c ".dir // empty")
+  BUILD_CMD=$(echo "${BUILD}" | jq -r .cmd)
+
+  if [[ -z ${BUILD_DIR} ]]; then
+    WORKDIR="${PROJECT_BASE}"
+  else
+    WORKDIR="${PROJECT_BASE}/${BUILD_DIR}"
+  fi
+
+  if [[ ! -e "${WORKDIR}" ]]; then
+    echo "ERROR: '${WORKDIR}' does not exist (${BUILD})"
+    exit 255
+  fi
+
+  if [[ ! -d "${WORKDIR}" ]]; then
+    echo "ERROR: '${WORKDIR}' is not a directory (${BUILD})"
+    exit 255
+  fi
+
+  DOCKER_COMMAND=(docker run --rm -it -v ${PROJECT_BASE}:${PROJECT_BASE} -w ${WORKDIR} -u $(id -u):$(id -g) ${DOCKER_IMAGE} ${BUILD_CMD})
+
+  echo "Run '${DOCKER_COMMAND[@]}'"
+  "${DOCKER_COMMAND[@]}"
+
+  if [[ $? -ne 0 ]]; then
+    echo "ERROR: '${BUILD}' failed"
+    exit 255
+  fi
+done
