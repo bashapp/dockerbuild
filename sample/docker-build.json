@@ -1,0 +1,12 @@
+{
+  "image" : "ubuntu:16.04",
+  "build" :
+  [
+    { "cmd" : "ls" },
+    {
+      "dir" : "box",
+      "cmd" : "cat MESSAGE"
+    }
+  ]
+}
+
